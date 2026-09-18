@@ -17,8 +17,14 @@
     "y": 16047.1
   },
   "elevation_m": {
-    "min": 0.0,
+    "min": 137.88,
     "max": 664.43
+  },
+  "void_handling": {
+    "rule": "elevation < 1.0 m treated as nodata (inland slice)",
+    "masked_cells": 0,
+    "method": "mask -> bilinear reproject with nan -> fillnodata inpaint -> crop to valid core",
+    "caveat": "invalid for coastal slices, where 0 m is real"
   },
   "heightmap": {
     "file": "valdorcia_heightmap_u16.png",
