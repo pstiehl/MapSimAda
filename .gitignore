@@ -6,3 +6,7 @@ __pycache__/
 .venv/
 node_modules/
 .DS_Store
+
+# Orthophoto mosaic: 15 MB, regenerable via pipeline/fetch_ortho.py, licensed
+# third-party imagery. Attribution obligations live in docs/LICENSES.md.
+web/public/ortho.jpg

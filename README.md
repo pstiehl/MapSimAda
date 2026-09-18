@@ -27,19 +27,26 @@ three and we own the result. See `docs/LICENSES.md`.
 
 ```bash
 python3 -m venv --without-pip .venv && curl -fsSL https://bootstrap.pypa.io/get-pip.py | .venv/bin/python3 -
-.venv/bin/pip install numpy rasterio shapely pyproj requests
+.venv/bin/pip install numpy rasterio shapely pyproj requests pillow
 
-.venv/bin/python3 pipeline/fetch_osm.py       # Overpass -> data/raw/osm/
-.venv/bin/python3 pipeline/fetch_dem.py       # Copernicus GLO-30 -> data/raw/dem/
-.venv/bin/python3 pipeline/inspect_osm.py     # feature tally + rail corridor
-.venv/bin/python3 pipeline/build_terrain.py   # crop, reproject, heightmap + manifest
+.venv/bin/python3 pipeline/fetch_osm.py        # Overpass -> data/raw/osm/
+.venv/bin/python3 pipeline/fetch_dem.py        # Copernicus GLO-30 -> data/raw/dem/
+.venv/bin/python3 pipeline/inspect_osm.py      # feature tally + rail corridor
+.venv/bin/python3 pipeline/build_terrain.py    # crop, reproject, void-fix, heightmap
+.venv/bin/python3 pipeline/fetch_ortho.py      # Regione Toscana 20cm ortho -> web/public/
+.venv/bin/python3 pipeline/export_features.py  # buildings, vines, olives, cypress
+.venv/bin/python3 pipeline/export_web.py       # terrain.bin + slice.json
 ```
+
+`data/raw/` and `web/public/ortho.jpg` are gitignored. The pipeline is the source of
+truth; the data is a cache. Serve `web/public/` over HTTP and open `index.html`.
 
 `data/raw/` is gitignored. The pipeline is the source of truth; the data is a cache.
 
 ## Roadmap
 
-- **v0** terrain + rail corridor + walk/ride traversal ← *here*
-- **v1** Regione Toscana 1 m LiDAR, orthophoto texturing, procedural vines/cypress
+- **v0** terrain + rail corridor + walk/ride traversal
+- **v0.2** Regione Toscana 20 cm orthophoto ground, 67k instanced plants, 5.2k buildings ← *here*
+- **v1** Regione Toscana 1 m LiDAR terrain (licence pending), building facades
 - **v2** streamed tiles + IndexedDB offline cache
 - **v3** authoritative server, shared world

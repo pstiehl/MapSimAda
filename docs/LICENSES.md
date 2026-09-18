@@ -69,14 +69,42 @@ No share-alike. Safe to bake into shipped assets.
 
 ---
 
-## ⚠️ Regione Toscana LiDAR + orthophotos — LICENCE TO VERIFY
+## ✅ Regione Toscana orthophotography 2024/2025 — CC-BY — **IN USE**
 
-1×1 m DTM/DSM (2019–2021 flights) and 2025 orthophotos. This is the quality upgrade
-that makes Tuscany look like Tuscany — 1 m ground resolution beats most shipped games.
+20 cm GSD colour aerial imagery, full regional coverage. This is the ground texture.
 
-**Not yet cleared.** Italian regional open geodata is normally CC-BY 4.0 or IODL 2.0,
-both of which would be fine, but the specific terms are unconfirmed. Do not bake into
-shipped assets until the licence text is read and recorded here.
+- Service: `https://www502.regione.toscana.it/ows_ofc/com.rt.wms.RTmap/wms?map=owsofc_rt`
+- Layer: `rt_ofc.5k24.32bit` — *"OFC 2024/2025 (GSD 20cm) di proprietà di Regione Toscana"*
+- Capabilities report `AccessConstraints: none`, `Fees: none`
+- Policy: regional open geodata released CC-BY / CC-BY-SA (Atto di Indirizzo 2013)
+
+Required attribution, rendered on-screen:
+
+> Aerial imagery: Regione Toscana — SIPT, ortofoto 2024/2025 (20 cm), CC-BY
+
+### ⛔ The layer next door that does NOT clear
+
+The general orthophoto service (`map=wmsofc`, layer `rt_ofc`) is tempting and wrong.
+It is a mixed-vintage, mixed-ownership composite, and its own service abstract states:
+
+> *Per obblighi di licenza gli strati delle ortofoto sono visualizzabili solo in
+> abbinamento ai disclaimer dei rispettivi proprietari del dato.*
+
+Viewable only alongside each data owner's disclaimer — so blanket regional CC-BY does
+not cover it. It was fetched once during development and deliberately discarded.
+**Do not point `fetch_ortho.py` back at it.** The same caution applies to the
+AGEA-sourced variants (`rt_ofc.5k25.*`), whose source photograms are AGEA property.
+
+---
+
+## ⚠️ Regione Toscana LiDAR 1 m DTM/DSM — LICENCE TO VERIFY
+
+1×1 m DTM/DSM from the 2019–2021 flights. Still the biggest outstanding upgrade:
+terrain is currently 25.6 m/px, which is the limiting factor on ground-level realism.
+
+**Not yet cleared.** Regional policy points to CC-BY/CC-BY-SA, but part of the Tuscan
+LiDAR holdings belong to the Ministero dell'Ambiente (PCN) rather than the Region, and
+those carry different terms. Confirm ownership per sheet before use.
 
 ---
 

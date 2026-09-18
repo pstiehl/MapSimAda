@@ -62,7 +62,9 @@ manifest = {
   "zMin": round(zmin, 2), "zMax": round(zmax, 2),
   "railPath": path,
   "spawn": {"x": round(W*px*0.5, 1), "y": round(H*py*0.5, 1)},
+  "ortho": {"file": "ortho.jpg", "mPerPx": 2.05},
   "attribution": [
+    "Aerial imagery: Regione Toscana \u2014 SIPT, ortofoto 2024/2025 (20 cm), CC-BY",
     "Elevation: Copernicus WorldDEM-30 \u00a9 DLR e.V. 2010-2014 and \u00a9 Airbus "
     "Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA",
     "Rail & features: \u00a9 OpenStreetMap contributors, ODbL 1.0"

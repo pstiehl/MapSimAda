@@ -49,6 +49,22 @@ const raw = new Uint16Array(await (await fetch('./terrain.bin')).arrayBuffer());
 await say('loading buildings and vegetation…');
 const F   = await (await fetch('./features.json')).json();
 
+// Aerial imagery is the single biggest realism lever; load it, but never let a
+// failed texture turn the whole world black -- fall back to the painted palette.
+let orthoTex=null;
+if (M.ortho) {
+  await say('loading 20 cm aerial imagery (' + M.ortho.file + ')…');
+  orthoTex = await new Promise(res=>{
+    new THREE.TextureLoader().load('./'+M.ortho.file, t=>res(t), undefined, ()=>res(null));
+  });
+  if (orthoTex) {
+    orthoTex.colorSpace = THREE.SRGBColorSpace;
+    orthoTex.wrapS = orthoTex.wrapT = THREE.ClampToEdgeWrapping;
+    orthoTex.minFilter = THREE.LinearMipmapLinearFilter;
+    orthoTex.generateMipmaps = true;
+  }
+}
+
 const W=M.width, H=M.height, P=M.pxSize, zMin=M.zMin, zMax=M.zMax;
 const zAt=(c,r)=> zMin + (raw[Math.min(Math.max(r,0),H-1)*W+Math.min(Math.max(c,0),W-1)]/65535)*(zMax-zMin);
 const ground=(x,y)=>{const fc=x/P,fr=y/P,c=Math.floor(fc),r=Math.floor(fr),tc=fc-c,tr=fr-r;
@@ -127,7 +143,12 @@ for(let i=0;i<pos.count;i++){
   tmp.toArray(col,i*3);
 }
 geo.setAttribute('color',new THREE.BufferAttribute(col,3)); geo.computeVertexNormals();
-const terrain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.96,metalness:0.0}));
+if (orthoTex) orthoTex.anisotropy = rend.capabilities.getMaxAnisotropy();
+// Plane UVs put v=1 on the north edge, which is image row 0 under three.js'
+// default flipY -- so the orthophoto lands in register with the heightfield.
+const terrain=new THREE.Mesh(geo, orthoTex
+  ? new THREE.MeshStandardMaterial({map:orthoTex,roughness:0.97,metalness:0.0})
+  : new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.96,metalness:0.0}));
 terrain.receiveShadow=true; terrain.position.set(M.spanX/2,0,M.spanY/2); scene.add(terrain);
 
 // ---------- instancing ----------
@@ -177,6 +198,12 @@ instance(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({colo
 await say('planting '+F.vine.length.toLocaleString()+' vines…');
 instance(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x5d6b3a,roughness:1}),
   F.vine,(o,p)=>{o.position.set(p[0],p[2]+0.85,p[1]); o.rotation.set(0,0.42,0); o.scale.set(2.5,1.7,0.75);});
+
+// With imagery on the ground the canopies read better slightly translucent and
+// desaturated -- the photo already carries the colour of the landscape.
+if (orthoTex) scene.traverse(o=>{
+  if (o.isInstancedMesh && o.material && o.material.color) o.material.color.multiplyScalar(0.92);
+});
 
 // ---------- rail ----------
 const rp=M.railPath.map(p=>new THREE.Vector3(p.x,p.z+0.35,p.y));
