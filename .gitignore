@@ -1,0 +1,8 @@
+# Raw third-party downloads: reproducible via pipeline/, never committed.
+# Keeps licensed bulk data out of the repo — deliberate, not just size.
+data/raw/
+data/derived/*.tif
+__pycache__/
+.venv/
+node_modules/
+.DS_Store

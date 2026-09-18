@@ -1,0 +1,33 @@
+{
+  "name": "valdorcia_slice_v0",
+  "crs": "EPSG:32632",
+  "bbox_wgs84": [
+    11.48,
+    42.98,
+    11.68,
+    43.12
+  ],
+  "raster": {
+    "width": 654,
+    "height": 626,
+    "metres_per_pixel": 25.6344
+  },
+  "ground_span_m": {
+    "x": 16764.9,
+    "y": 16047.1
+  },
+  "elevation_m": {
+    "min": 0.0,
+    "max": 664.43
+  },
+  "heightmap": {
+    "file": "valdorcia_heightmap_u16.png",
+    "encoding": "uint16 linear",
+    "decode": "elev_m = min + (v/65535)*(max-min)"
+  },
+  "source": {
+    "dataset": "Copernicus DEM GLO-30",
+    "attribution": "Produced using Copernicus WorldDEM-30 \u00a9 DLR e.V. 2010-2014 and \u00a9 Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "upgrade_path": "Regione Toscana 1m LiDAR DTM/DSM (2019-2021)"
+  }
+}
