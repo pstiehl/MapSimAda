@@ -1,130 +1,241 @@
 <!DOCTYPE html>
-<meta charset="utf-8"><title>MapSimAda — Val d'Orcia v0</title>
+<meta charset="utf-8"><title>MapSimAda — Val d'Orcia</title>
 <style>
- html,body{margin:0;height:100%;background:#0d1014;overflow:hidden;
-   font:13px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;color:#e8e6e1}
+ html,body{margin:0;height:100%;background:#0b0e12;overflow:hidden;
+   font:13px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif;color:#e9e7e2}
  canvas{display:block}
- #hud{position:fixed;top:14px;left:14px;background:rgba(10,12,16,.76);
-   padding:12px 15px;border-radius:9px;backdrop-filter:blur(9px);
-   border:1px solid rgba(255,255,255,.1);max-width:310px}
- #hud b{color:#ecc448;font-weight:600} kbd{background:#2b2f37;border-radius:4px;
-   padding:1px 6px;font:11px ui-monospace,monospace;border:1px solid #3d424c}
- #attr{position:fixed;bottom:0;left:0;right:0;background:rgba(8,10,13,.82);
-   padding:7px 14px;font-size:10.5px;color:#9aa0aa;line-height:1.45}
- #boot{position:fixed;inset:0;display:grid;place-items:center;background:#0d1014;
-   font-size:15px;color:#b8bcc4;z-index:9}
- #mode{color:#7fd1a8;font-weight:600}
+ #hud{position:fixed;top:14px;left:14px;background:rgba(9,11,15,.72);padding:12px 15px;
+   border-radius:10px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.09);max-width:330px}
+ #hud b{color:#e9b949;font-weight:600}
+ kbd{background:#292d35;border-radius:4px;padding:1px 6px;font:11px ui-monospace,monospace;border:1px solid #3c414b}
+ #attr{position:fixed;bottom:0;left:0;right:0;background:rgba(7,9,12,.8);padding:7px 14px;
+   font-size:10.5px;color:#959ba5;line-height:1.45}
+ #boot{position:fixed;inset:0;display:grid;place-items:center;background:#0b0e12;z-index:9;
+   font-size:15px;color:#b6bac2;text-align:center}
+ #err{position:fixed;inset:24px;background:#1a1013;border:1px solid #6b2b34;border-radius:10px;
+   padding:18px;overflow:auto;white-space:pre-wrap;font:12px ui-monospace,monospace;color:#ffb4b4;z-index:20}
+ #mode{color:#84d3aa;font-weight:600} #pos{color:#959ba5;font-size:11.5px;margin:4px 0 9px}
+ .row{margin-top:3px}
 </style>
-<div id="boot">loading Val d'Orcia…</div>
+<div id="boot">building the Val d'Orcia…<br><span style="font-size:12px;color:#7d838d" id="bootmsg"></span></div>
 <div id="hud" hidden>
-  <div style="font-size:15px;font-weight:600;margin-bottom:5px">Val d'Orcia <b>v0</b></div>
+  <div style="font-size:15px;font-weight:600;margin-bottom:5px">Val d'Orcia <b>v0.2</b></div>
   <div>Mode: <span id="mode">walking</span></div>
-  <div id="pos" style="color:#9aa0aa;font-size:11.5px;margin:4px 0 9px"></div>
-  <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>shift</kbd> run</div>
-  <div style="margin-top:3px"><kbd>T</kbd> board / leave the train</div>
-  <div style="margin-top:3px"><kbd>click</kbd> look around &nbsp; <kbd>esc</kbd> release</div>
+  <div id="pos"></div>
+  <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>shift</kbd> run</div>
+  <div class="row"><kbd>T</kbd> board / leave the train</div>
+  <div class="row"><kbd>F</kbd> fly · <kbd>space</kbd>/<kbd>C</kbd> up·down</div>
+  <div class="row"><kbd>[</kbd> <kbd>]</kbd> time of day</div>
+  <div class="row"><kbd>click</kbd> look · <kbd>esc</kbd> release</div>
 </div>
 <div id="attr"></div>
-<script type="importmap">
-{"imports":{"three":"https://unpkg.com/three@0.169.0/build/three.module.js"}}
+<script>
+ // surface any failure on screen instead of a silent black canvas
+ window.addEventListener('error', e=>{
+   const d=document.getElementById('err')||Object.assign(document.createElement('div'),{id:'err'});
+   d.textContent='Renderer error:\n\n'+(e.error&&e.error.stack||e.message);
+   document.body.appendChild(d); const b=document.getElementById('boot'); if(b) b.remove();
+ });
 </script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.169.0/build/three.module.js"}}</script>
 <script type="module">
 import * as THREE from 'three';
+const bm = document.getElementById('bootmsg');
+const say = async t => { bm.textContent = t; await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0))); };
 
-const M = await (await fetch('./slice.json')).json();
+await say('loading terrain…');
+const M   = await (await fetch('./slice.json')).json();
 const raw = new Uint16Array(await (await fetch('./terrain.bin')).arrayBuffer());
-const {width:W, height:H, pxSize:P, zMin, zMax} = M;
-const zAt = (c,r)=> zMin + (raw[Math.min(Math.max(r,0),H-1)*W + Math.min(Math.max(c,0),W-1)]/65535)*(zMax-zMin);
-const ground = (x,y)=>{                       // bilinear sample, metres
-  const fc=x/P, fr=y/P, c=Math.floor(fc), r=Math.floor(fr), tc=fc-c, tr=fr-r;
-  return (zAt(c,r)*(1-tc)+zAt(c+1,r)*tc)*(1-tr) + (zAt(c,r+1)*(1-tc)+zAt(c+1,r+1)*tc)*tr;
-};
+await say('loading buildings and vegetation…');
+const F   = await (await fetch('./features.json')).json();
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9db4c8);
-scene.fog = new THREE.Fog(0x9db4c8, 2600, 11000);
-const cam = new THREE.PerspectiveCamera(66, innerWidth/innerHeight, 0.5, 26000);
-const rend = new THREE.WebGLRenderer({antialias:true});
-rend.setSize(innerWidth, innerHeight);
-rend.setPixelRatio(Math.min(devicePixelRatio,2));
+const W=M.width, H=M.height, P=M.pxSize, zMin=M.zMin, zMax=M.zMax;
+const zAt=(c,r)=> zMin + (raw[Math.min(Math.max(r,0),H-1)*W+Math.min(Math.max(c,0),W-1)]/65535)*(zMax-zMin);
+const ground=(x,y)=>{const fc=x/P,fr=y/P,c=Math.floor(fc),r=Math.floor(fr),tc=fc-c,tr=fr-r;
+  return (zAt(c,r)*(1-tc)+zAt(c+1,r)*tc)*(1-tr)+(zAt(c,r+1)*(1-tc)+zAt(c+1,r+1)*tc)*tr;};
+
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.4,30000);
+const rend=new THREE.WebGLRenderer({antialias:true});
+rend.setSize(innerWidth,innerHeight); rend.setPixelRatio(Math.min(devicePixelRatio,1.8));
+rend.outputColorSpace=THREE.SRGBColorSpace;
+rend.toneMapping=THREE.ACESFilmicToneMapping; rend.toneMappingExposure=1.05;
+rend.shadowMap.enabled=true; rend.shadowMap.type=THREE.PCFSoftShadowMap;
 document.body.appendChild(rend.domElement);
 
-scene.add(new THREE.HemisphereLight(0xcfe0f0, 0x4a4436, 1.25));
-const sun = new THREE.DirectionalLight(0xffeccc, 1.5);
-sun.position.set(-1,1.15,0.55).multiplyScalar(4000); scene.add(sun);
+// ---------- sky ----------
+const sky=new THREE.Mesh(new THREE.SphereGeometry(24000,32,20),
+ new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:{
+   sun:{value:new THREE.Vector3(0,1,0)},hz:{value:new THREE.Color(0xdcd3c2)},
+   zen:{value:new THREE.Color(0x3f74b8)},gl:{value:new THREE.Color(0xffd9a0)}},
+  vertexShader:'varying vec3 v;void main(){v=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:[
+   'uniform vec3 sun,hz,zen,gl;varying vec3 v;',
+   'void main(){',
+   ' float h=clamp(v.y*1.15+0.06,0.0,1.0);',
+   ' vec3 c=mix(hz,zen,pow(h,0.62));',
+   ' float d=max(dot(normalize(v),normalize(sun)),0.0);',
+   ' c+=gl*pow(d,7.0)*0.85; c+=gl*pow(d,220.0)*3.2;',
+   ' c=mix(c,hz*1.04,smoothstep(0.10,-0.05,v.y));',
+   ' gl_FragColor=vec4(c,1.0);}'].join('\n')}));
+scene.add(sky);
 
-// ---- terrain ----
-const geo = new THREE.PlaneGeometry(M.spanX, M.spanY, W-1, H-1);
-geo.rotateX(-Math.PI/2);
-const pos = geo.attributes.position, col = new Float32Array(pos.count*3);
-const cLow=new THREE.Color(0x6f8348), cMid=new THREE.Color(0x9a9c62), cHi=new THREE.Color(0xc4b393);
-for (let i=0;i<pos.count;i++){
-  const r = Math.floor(i/W), c = i%W, h = zAt(c,r);
-  pos.setY(i,h);
-  const t=(h-zMin)/(zMax-zMin);
-  const col3 = t<0.5 ? cLow.clone().lerp(cMid,t*2) : cMid.clone().lerp(cHi,(t-0.5)*2);
-  col3.toArray(col,i*3);
+const hemi=new THREE.HemisphereLight(0xbcd2ea,0x5b5340,0.85); scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff0d4,2.5);
+sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.near=1; sun.shadow.camera.far=3400;
+const SH=560;
+sun.shadow.camera.left=-SH; sun.shadow.camera.right=SH;
+sun.shadow.camera.top=SH;   sun.shadow.camera.bottom=-SH;
+sun.shadow.bias=-0.0009; sun.shadow.camera.updateProjectionMatrix();
+scene.add(sun); scene.add(sun.target);
+
+let tod=0.30;
+const sunDir=new THREE.Vector3();
+function setSun(){
+  const a=Math.PI*(0.10+tod*0.80), el=Math.sin(a), az=2.25;
+  sunDir.set(Math.cos(az)*Math.max(0.12,1-el), Math.max(0.03,el), Math.sin(az)*Math.max(0.12,1-el)).normalize();
+  sky.material.uniforms.sun.value.copy(sunDir);
+  const warm=1-Math.min(1,el*1.5);
+  sun.color.setHSL(0.085, 0.30+0.45*warm, 0.52+0.10*warm);
+  sun.intensity=0.7+2.3*Math.max(0.05,el);
+  hemi.intensity=0.32+0.75*Math.max(0.05,el);
+  const haze=new THREE.Color().setHSL(0.09,0.18+0.30*warm,0.60+0.16*el);
+  scene.fog=new THREE.FogExp2(haze.getHex(), 0.000082);
+  sky.material.uniforms.hz.value.copy(haze);
+  sky.material.uniforms.zen.value.setHSL(0.60,0.48,0.18+0.30*el);
 }
-geo.setAttribute('color', new THREE.BufferAttribute(col,3));
-geo.computeVertexNormals();
-const terrain = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({vertexColors:true}));
-terrain.position.set(M.spanX/2, 0, M.spanY/2);      // world origin at raster corner
-scene.add(terrain);
+setSun();
 
-// ---- rail ----
-const rp = M.railPath.map(p=>new THREE.Vector3(p.x, p.z+0.9, p.y));
-scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp),
-                         new THREE.LineBasicMaterial({color:0x3a3a40})));
-const curve = new THREE.CatmullRomCurve3(rp);
-const railLen = curve.getLength();
+// ---------- terrain ----------
+await say('building terrain mesh…');
+const geo=new THREE.PlaneGeometry(M.spanX,M.spanY,W-1,H-1); geo.rotateX(-Math.PI/2);
+const pos=geo.attributes.position, col=new Float32Array(pos.count*3);
+const plough=new THREE.Color(0x8a6f4e), wheat=new THREE.Color(0xbca469),
+      grass=new THREE.Color(0x6e7f46), wood=new THREE.Color(0x4a5a34), rock=new THREE.Color(0xa99a80);
+const nz=(x,y)=>Math.sin(x*0.0021)*Math.cos(y*0.0017)+0.5*Math.sin(x*0.0063+1.7)*Math.cos(y*0.0051-0.9);
+const tmp=new THREE.Color();
+for(let i=0;i<pos.count;i++){
+  const r=Math.floor(i/W), c=i%W, hh=zAt(c,r); pos.setY(i,hh);
+  const sl=Math.min(1,(Math.abs(zAt(c+1,r)-zAt(c-1,r))+Math.abs(zAt(c,r+1)-zAt(c,r-1)))/(4*P)*3.4);
+  const t=(hh-zMin)/(zMax-zMin), n=nz(c*P,r*P);
+  tmp.copy(plough).lerp(wheat,Math.min(1,Math.max(0,0.5+0.5*n)));
+  tmp.lerp(grass,Math.min(1,t*1.15));
+  tmp.lerp(wood,Math.min(1,sl*0.85));
+  tmp.lerp(rock,Math.max(0,sl-0.75)*1.6);
+  tmp.offsetHSL(0,0,n*0.022);
+  tmp.toArray(col,i*3);
+}
+geo.setAttribute('color',new THREE.BufferAttribute(col,3)); geo.computeVertexNormals();
+const terrain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.96,metalness:0.0}));
+terrain.receiveShadow=true; terrain.position.set(M.spanX/2,0,M.spanY/2); scene.add(terrain);
 
-// ---- controls ----
-let walking = true, s = 0.34, yaw = -0.6, pitch = -0.04;
-const player = new THREE.Vector3(M.spawn.x, 0, M.spawn.y);
-const keys = {};
-addEventListener('keydown', e=>{
-  keys[e.code]=true;
-  if (e.code==='KeyT'){ walking=!walking; mode.textContent = walking?'walking':'aboard the train'; }
-});
-addEventListener('keyup', e=>keys[e.code]=false);
-rend.domElement.onclick = ()=>rend.domElement.requestPointerLock();
-addEventListener('mousemove', e=>{
-  if (document.pointerLockElement!==rend.domElement) return;
-  yaw -= e.movementX*0.0022;
-  pitch = Math.max(-1.4, Math.min(1.4, pitch - e.movementY*0.0022));
-});
-addEventListener('resize', ()=>{
-  cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
-  rend.setSize(innerWidth,innerHeight);
-});
+// ---------- instancing ----------
+const d4=new THREE.Object3D();
+function instance(g,m,list,place,shadow){
+  if(!list||!list.length) return null;
+  const im=new THREE.InstancedMesh(g,m,list.length);
+  im.castShadow=!!shadow; im.receiveShadow=false;
+  for(let i=0;i<list.length;i++){ place(d4,list[i],i); d4.updateMatrix(); im.setMatrixAt(i,d4.matrix); }
+  im.instanceMatrix.needsUpdate=true; scene.add(im); return im;
+}
+const jit=(i,k)=>{const v=Math.sin(i*12.9898+k*78.233)*43758.5453; return v-Math.floor(v);};
 
-const EYE = 1.7, clk = new THREE.Clock();
+await say('placing '+F.buildings.length.toLocaleString()+' buildings…');
+const wallMats=[0xd8c8ad,0xcdb996,0xc6aa88,0xdccdb4].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:0.92}));
+const roofMat=new THREE.MeshStandardMaterial({color:0x9c5a3c,roughness:0.85});
+for(let k=0;k<wallMats.length;k++){
+  const sub=F.buildings.filter((_,i)=>i%wallMats.length===k);
+  instance(new THREE.BoxGeometry(1,1,1),wallMats[k],sub,(o,b)=>{
+    o.position.set(b.x,b.z+b.hgt/2,b.y); o.rotation.set(0,-b.rot,0); o.scale.set(b.w,b.hgt,b.d);
+  },true);
+  instance(new THREE.ConeGeometry(0.72,1,4),roofMat,sub,(o,b)=>{
+    const span=Math.max(b.w,b.d);
+    o.position.set(b.x,b.z+b.hgt+span*0.10,b.y);
+    o.rotation.set(0,-b.rot+Math.PI/4,0);
+    o.scale.set(span*1.42,span*0.34,span*1.42);
+  },true);
+}
+
+await say('planting '+F.cypress.length.toLocaleString()+' cypress…');
+instance(new THREE.ConeGeometry(0.5,1,7),new THREE.MeshStandardMaterial({color:0x2f4230,roughness:1}),
+  F.cypress,(o,p,i)=>{const hh=8.5+jit(i,1)*5.5,wd=1.25+jit(i,2)*0.5;
+    o.position.set(p[0],p[2]+hh/2,p[1]); o.rotation.set(0,jit(i,3)*6.28,0); o.scale.set(wd,hh,wd);},true);
+
+await say('planting '+F.olive.length.toLocaleString()+' olive trees…');
+instance(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x7d8a63,roughness:1,flatShading:true}),
+  F.olive,(o,p,i)=>{const s=1.7+jit(i,4)*1.0;
+    o.position.set(p[0],p[2]+s*0.95,p[1]); o.rotation.set(0,jit(i,5)*6.28,0); o.scale.set(s*1.25,s*0.85,s*1.25);});
+
+await say('planting '+F.tree.length.toLocaleString()+' trees…');
+instance(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x44552f,roughness:1,flatShading:true}),
+  F.tree,(o,p,i)=>{const s=2.6+jit(i,6)*2.4;
+    o.position.set(p[0],p[2]+s*1.05,p[1]); o.rotation.set(0,jit(i,7)*6.28,0); o.scale.set(s,s*1.15,s);});
+instance(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x6a6b41,roughness:1,flatShading:true}),
+  F.bush,(o,p,i)=>{const s=0.9+jit(i,8)*0.8; o.position.set(p[0],p[2]+s*0.6,p[1]); o.scale.set(s*1.4,s,s*1.4);});
+
+await say('planting '+F.vine.length.toLocaleString()+' vines…');
+instance(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x5d6b3a,roughness:1}),
+  F.vine,(o,p)=>{o.position.set(p[0],p[2]+0.85,p[1]); o.rotation.set(0,0.42,0); o.scale.set(2.5,1.7,0.75);});
+
+// ---------- rail ----------
+const rp=M.railPath.map(p=>new THREE.Vector3(p.x,p.z+0.35,p.y));
+const curve=new THREE.CatmullRomCurve3(rp), railLen=curve.getLength();
+scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve,1400,1.9,4,false),
+  new THREE.MeshStandardMaterial({color:0x6b6153,roughness:1})));
+
+// ---------- controls ----------
+let walking=true, flying=false, s=0.30, yaw=-0.7, pitch=-0.05;
+const player=new THREE.Vector3(M.spawn.x,0,M.spawn.y);
+let flyY=ground(player.x,player.z)+140;
+const keys={};
+const mode=document.getElementById('mode'), pos_=document.getElementById('pos');
+addEventListener('keydown',e=>{keys[e.code]=true;
+  if(e.code==='KeyT'){walking=!walking;flying=false;mode.textContent=walking?'walking':'aboard the train';}
+  if(e.code==='KeyF'&&walking){flying=!flying;flyY=Math.max(flyY,ground(player.x,player.z)+90);
+    mode.textContent=flying?'flying':'walking';}
+  if(e.code==='BracketLeft'){tod=Math.max(0,tod-0.045);setSun();}
+  if(e.code==='BracketRight'){tod=Math.min(1,tod+0.045);setSun();}});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+rend.domElement.onclick=()=>rend.domElement.requestPointerLock();
+addEventListener('mousemove',e=>{if(document.pointerLockElement!==rend.domElement)return;
+  yaw-=e.movementX*0.0021; pitch=Math.max(-1.45,Math.min(1.45,pitch-e.movementY*0.0021));});
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();
+  rend.setSize(innerWidth,innerHeight);});
+document.getElementById('attr').textContent=M.attribution.join('   ·   ');
+
+const EYE=1.68, clk=new THREE.Clock();
 function frame(){
-  const dt = Math.min(clk.getDelta(), 0.1);
-  if (walking){
-    const v = (keys.ShiftLeft||keys.ShiftRight ? 14 : 4.2) * dt;
-    const f = (keys.KeyW?1:0)-(keys.KeyS?1:0), st = (keys.KeyD?1:0)-(keys.KeyA?1:0);
-    player.x += (Math.sin(yaw)*-f + Math.cos(yaw)*st) * v;
-    player.z += (Math.cos(yaw)*-f - Math.sin(yaw)*st) * v;
-    player.x = Math.max(1, Math.min(M.spanX-1, player.x));
-    player.z = Math.max(1, Math.min(M.spanY-1, player.z));
-    cam.position.set(player.x, ground(player.x, player.z)+EYE, player.z);
-    cam.rotation.set(pitch, yaw, 0, 'YXZ');
-    pos_.textContent = `${(player.x/1000).toFixed(2)} km E · ${(player.z/1000).toFixed(2)} km S · ${ground(player.x,player.z).toFixed(0)} m`;
+  const dt=Math.min(clk.getDelta(),0.1);
+  if(walking){
+    const run=keys.ShiftLeft||keys.ShiftRight;
+    const v=(flying?(run?340:95):(run?13:4.1))*dt;
+    const f=(keys.KeyW?1:0)-(keys.KeyS?1:0), st=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+    player.x+=(Math.sin(yaw)*-f+Math.cos(yaw)*st)*v;
+    player.z+=(Math.cos(yaw)*-f-Math.sin(yaw)*st)*v;
+    player.x=Math.max(2,Math.min(M.spanX-2,player.x));
+    player.z=Math.max(2,Math.min(M.spanY-2,player.z));
+    if(flying){
+      flyY+=((keys.Space?1:0)-(keys.KeyC?1:0))*v;
+      flyY=Math.max(ground(player.x,player.z)+8,flyY);
+      cam.position.set(player.x,flyY,player.z);
+    } else cam.position.set(player.x,ground(player.x,player.z)+EYE,player.z);
+    cam.rotation.set(pitch,yaw,0,'YXZ');
+    pos_.textContent=(player.x/1000).toFixed(2)+' km E · '+(player.z/1000).toFixed(2)+
+      ' km S · '+ground(player.x,player.z).toFixed(0)+' m';
   } else {
-    s += (17*dt)/railLen; if (s>1) s -= 1;              // ~61 km/h
-    const p = curve.getPointAt(s), look = curve.getPointAt(Math.min(s+0.004,1));
-    cam.position.set(p.x, p.y+2.6, p.z);
-    cam.lookAt(look.x, look.y+2.6, look.z);
-    player.set(p.x, 0, p.z);
-    pos_.textContent = `Asciano–Monte Antico · ${(s*railLen/1000).toFixed(2)} / ${(railLen/1000).toFixed(2)} km`;
+    s+=(19*dt)/railLen; if(s>1) s-=1;
+    const p=curve.getPointAt(s), lk=curve.getPointAt(Math.min(s+0.0035,1));
+    cam.position.set(p.x,p.y+2.7,p.z); cam.lookAt(lk.x,lk.y+2.7,lk.z);
+    player.set(p.x,0,p.z);
+    pos_.textContent='Asciano–Monte Antico · '+(s*railLen/1000).toFixed(2)+' / '+(railLen/1000).toFixed(2)+' km';
   }
-  rend.render(scene, cam);
-  requestAnimationFrame(frame);
+  sky.position.copy(cam.position);
+  sun.position.copy(cam.position).addScaledVector(sunDir,1500);
+  sun.target.position.copy(cam.position);
+  rend.render(scene,cam); requestAnimationFrame(frame);
 }
-const mode = document.getElementById('mode'), pos_ = document.getElementById('pos');
-document.getElementById('attr').textContent = M.attribution.join('  ·  ');
-document.getElementById('boot').remove();
-document.getElementById('hud').hidden = false;
+const boot=document.getElementById('boot'); if(boot) boot.remove();
+document.getElementById('hud').hidden=false;
 frame();
 </script>
